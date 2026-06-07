@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""vibe-match CLI - 心流：氛围匹配发现引擎"""
+import argparse
+import json
+import sys
+import os
+from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(__file__))
+import atmosphere_vec
+
+
+def cmd_query(args):
+    hour = args.hour if args.hour is not None else datetime.now().hour
+    results = atmosphere_vec.match_venues(
+        text=args.text, lat=args.lat, lng=args.lng,
+        radius_m=args.radius, hour=hour,
+    )
+    top = results[:args.limit]
+    output = {
+        "query": args.text,
+        "parsed_vibe": {
+            dim: round(val, 2)
+            for dim, val in zip(atmosphere_vec.VIBE_DIMS,
+                                atmosphere_vec.text_to_vibe_vector(args.text))
+        },
+        "found": len(top),
+        "matches": [
+            {
+                "rank": i + 1,
+                "venue": {
+                    "id": v["id"],
+                    "name": v["name"],
+                    "type": v.get("type", ""),
+                    "area": v.get("area", ""),
+                    "avg_price": v.get("avg_price", 0),
+                    "hours": v.get("hours", {}),
+                    "tags": v.get("tags", []),
+                    "music": v.get("music", ""),
+                    "signature": v.get("signature", ""),
+                },
+                "match_pct": f"{int(v['match_score'] * 100)}%",
+                "match_score": v["match_score"],
+                "distance_m": v.get("distance_m", 0),
+                "dim_match": v["dim_match"],
+            }
+            for i, v in enumerate(top)
+        ],
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def cmd_profile(args):
+    result = atmosphere_vec.get_venue_profile(args.poi_id)
+    if not result:
+        print(json.dumps({"error": f"未找到场所 {args.poi_id}"}, ensure_ascii=False, indent=2))
+        return
+    output = {
+        "venue": {
+            "id": result["venue"]["id"],
+            "name": result["venue"]["name"],
+            "type": result["venue"].get("type", ""),
+        },
+        "atmosphere_vector": result["vector"],
+        "atmosphere_radar": result["radar"],
+        "best_for": result["venue"].get("best_for", []),
+        "music": result["venue"].get("music", ""),
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def cmd_compare(args):
+    result = atmosphere_vec.compare_venues(args.poi_a, args.poi_b)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="vibematch", description="心流 - 氛围匹配发现引擎")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_query = sub.add_parser("query", help="氛围搜索")
+    p_query.add_argument("--text", required=True, help="描述你想要的氛围")
+    p_query.add_argument("--lat", type=float, default=None)
+    p_query.add_argument("--lng", type=float, default=None)
+    p_query.add_argument("--radius", type=float, default=5000)
+    p_query.add_argument("--hour", type=int, default=None)
+    p_query.add_argument("--limit", type=int, default=3)
+    p_query.set_defaults(func=cmd_query)
+
+    p_profile = sub.add_parser("profile", help="查看场所氛围画像")
+    p_profile.add_argument("--poi-id", required=True)
+    p_profile.set_defaults(func=cmd_profile)
+
+    p_compare = sub.add_parser("compare", help="对比两个场所氛围")
+    p_compare.add_argument("--poi-a", required=True)
+    p_compare.add_argument("--poi-b", required=True)
+    p_compare.set_defaults(func=cmd_compare)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

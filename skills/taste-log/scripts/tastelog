@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""taste-log CLI – 记味: 你的味觉图谱管理器"""
+import argparse
+import json
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+import taste_graph
+
+
+def cmd_log(args):
+    tags = args.tags.split(",") if args.tags else []
+    result = taste_graph.log_entry(
+        user_id=args.user, poi_id=args.poi_id, score=args.score,
+        note=args.note, tags=tags, poi_name=args.poi_name or "",
+        category=args.category or "", subcategory=args.subcategory or "",
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_profile(args):
+    result = taste_graph.get_profile(args.user)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_query(args):
+    result = taste_graph.query_category(args.user, args.category)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_export(args):
+    result = taste_graph.export_profile(args.user)
+    if args.format == "json":
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"用户: {result['user_id']}")
+        print(f"总记录: {result['total_entries']}")
+        for cat, info in result['categories'].items():
+            print(f"  {cat}: 平均 {info['avg_score']}分, {info['count']}次")
+
+
+def cmd_delete(args):
+    result = taste_graph.delete_entry(args.entry_id)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_clear(args):
+    result = taste_graph.clear_user(args.user)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="tastelog", description="记味 - 味觉图谱管理")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_log = sub.add_parser("log", help="记录一次味觉评价")
+    p_log.add_argument("--user", required=True)
+    p_log.add_argument("--poi-id", required=True)
+    p_log.add_argument("--score", type=float, required=True)
+    p_log.add_argument("--note", default="")
+    p_log.add_argument("--tags", default="")
+    p_log.add_argument("--poi-name", default="")
+    p_log.add_argument("--category", default="")
+    p_log.add_argument("--subcategory", default="")
+    p_log.set_defaults(func=cmd_log)
+
+    p_profile = sub.add_parser("profile", help="查看味觉画像")
+    p_profile.add_argument("--user", required=True)
+    p_profile.set_defaults(func=cmd_profile)
+
+    p_query = sub.add_parser("query", help="查询某品类偏好")
+    p_query.add_argument("--user", required=True)
+    p_query.add_argument("--category", required=True)
+    p_query.set_defaults(func=cmd_query)
+
+    p_export = sub.add_parser("export", help="导出味觉数据")
+    p_export.add_argument("--user", required=True)
+    p_export.add_argument("--format", choices=["json", "text"], default="json")
+    p_export.set_defaults(func=cmd_export)
+
+    p_delete = sub.add_parser("delete", help="删除一条记录")
+    p_delete.add_argument("--entry-id", type=int, required=True)
+    p_delete.set_defaults(func=cmd_delete)
+
+    p_clear = sub.add_parser("clear", help="清空用户所有数据")
+    p_clear.add_argument("--user", required=True)
+    p_clear.set_defaults(func=cmd_clear)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

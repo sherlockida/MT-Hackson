@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""pin-zhuo CLI — 拼桌：群聊聚餐约束求解器"""
+import argparse
+import json
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+import group_pref
+import constraint_solver
+
+
+def cmd_start(args):
+    members = [m.strip() for m in args.members.split(",")]
+    result = group_pref.start_session(args.group_id, members, args.date)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_constrain(args):
+    dietary = [x.strip() for x in args.dietary_exclude.split(",")] if args.dietary_exclude else []
+    cuisine = [x.strip() for x in args.cuisine_prefer.split(",")] if args.cuisine_prefer else []
+    time_w = [x.strip() for x in args.time_windows.split(",")] if args.time_windows else []
+    result = group_pref.add_constraint(
+        group_id=args.group_id, member_id=args.member,
+        location=args.location, budget_max=args.budget_max,
+        dietary_exclude=dietary, cuisine_prefer=cuisine,
+        time_windows=time_w,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_solve(args):
+    constraints = group_pref.get_all_constraints(args.group_id)
+    if not constraints:
+        print(json.dumps({"error": f"未找到群组 {args.group_id} 的约束数据"}, ensure_ascii=False, indent=2))
+        return
+    result = constraint_solver.solve(constraints)
+    output = {
+        "group_id": args.group_id,
+        "member_count": len(constraints),
+        **result,
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def cmd_explain(args):
+    constraints = group_pref.get_all_constraints(args.group_id)
+    result = constraint_solver.solve(constraints)
+    solutions = result.get("solutions", [])
+
+    sol_idx = 0
+    if args.solution_id:
+        try:
+            sol_idx = int(args.solution_id.replace("sol_", "")) - 1
+        except (ValueError, IndexError):
+            sol_idx = 0
+
+    if sol_idx >= len(solutions):
+        print(json.dumps({"error": "方案不存在"}, ensure_ascii=False, indent=2))
+        return
+
+    sol = solutions[sol_idx]
+    explanation = {
+        "solution_id": f"sol_{sol_idx + 1}",
+        "restaurant": sol["restaurant"],
+        "why": sol["why"],
+        "fairness_score": sol["fairness"],
+        "efficiency_score": sol["efficiency"],
+        "per_member_breakdown": {
+            member: {
+                "satisfaction_pct": f"{int(info['score'] * 100)}%",
+                "constraints_met": info["met"],
+                "constraints_stretched": info["stretched"],
+                "distance_from_member": f"{info['distance_km']}km",
+            }
+            for member, info in sol["satisfaction"].items()
+        },
+        "explanation": (
+            f"选择 {sol['restaurant']['name']} 是因为: {'; '.join(sol['why'])}. "
+            f"公平性评分 {sol['fairness']:.0%}（最不满意的也有此满意度）, "
+            f"整体效率 {sol['efficiency']:.0%}. "
+        ),
+    }
+    print(json.dumps(explanation, ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="pinzhuo", description="拼桌 — 群聊聚餐约束求解器")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_start = sub.add_parser("start", help="创建聚餐会话")
+    p_start.add_argument("--group-id", required=True)
+    p_start.add_argument("--members", required=True, help="逗号分隔的成员列表")
+    p_start.add_argument("--date", required=True)
+    p_start.set_defaults(func=cmd_start)
+
+    p_con = sub.add_parser("constrain", help="添加成员约束")
+    p_con.add_argument("--group-id", required=True)
+    p_con.add_argument("--member", required=True)
+    p_con.add_argument("--location", default="")
+    p_con.add_argument("--budget-max", type=int, default=200)
+    p_con.add_argument("--dietary-exclude", default="")
+    p_con.add_argument("--cuisine-prefer", default="")
+    p_con.add_argument("--time-windows", default="")
+    p_con.set_defaults(func=cmd_constrain)
+
+    p_solve = sub.add_parser("solve", help="求解最优方案")
+    p_solve.add_argument("--group-id", required=True)
+    p_solve.set_defaults(func=cmd_solve)
+
+    p_explain = sub.add_parser("explain", help="解释方案")
+    p_explain.add_argument("--group-id", required=True)
+    p_explain.add_argument("--solution-id", default="sol_1")
+    p_explain.set_defaults(func=cmd_explain)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

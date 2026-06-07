@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""street-scan CLI - 街探: 实时行走发现引擎"""
+import argparse
+import json
+import sys
+import os
+from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(__file__))
+import poi_engine
+import novelty_ranker
+from common_geo import walk_instruction, bearing_label
+
+
+def cmd_drift(args):
+    pois = poi_engine.load_pois()
+    nearby = poi_engine.filter_by_radius(pois, args.lat, args.lng, args.radius, args.heading)
+    hour = args.hour if args.hour is not None else datetime.now().hour
+    nearby = poi_engine.filter_open_now(nearby, hour)
+    context = {"hour": hour, "mood": args.mood or ""}
+    ranked = novelty_ranker.rank_pois(nearby, args.user or "mock_user_zhao", context)
+
+    results = []
+    for poi in ranked[:5]:
+        results.append({
+            "poi": {
+                "id": poi["id"],
+                "name": poi["name"],
+                "category": poi["category"],
+                "subcategory": poi.get("subcategory", ""),
+                "distance_m": poi["distance_m"],
+                "direction": poi["direction"],
+                "tags": poi.get("tags", []),
+                "signature": poi.get("signature", ""),
+                "avg_price": poi.get("avg_price", 0),
+                "rating": poi.get("rating", 0),
+            },
+            "why": poi["why"],
+            "walk": walk_instruction(poi["distance_m"], poi["direction"]),
+            "novelty_score": poi["novelty_score"],
+            "total_score": poi["total_score"],
+            "vibe_tags": list(poi.get("vibe", {}).keys()) if poi.get("vibe") else [],
+        })
+
+    output = {
+        "mode": "drift",
+        "location": {"lat": args.lat, "lng": args.lng},
+        "heading": args.heading,
+        "radius_m": args.radius,
+        "found": len(results),
+        "recommendations": results,
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def cmd_around(args):
+    pois = poi_engine.load_pois()
+    nearby = poi_engine.filter_by_radius(pois, args.lat, args.lng, args.radius)
+    hour = args.hour if args.hour is not None else datetime.now().hour
+    nearby = poi_engine.filter_open_now(nearby, hour)
+    context = {"hour": hour, "mood": args.mood or ""}
+    ranked = novelty_ranker.rank_pois(nearby, args.user or "mock_user_zhao", context)
+
+    results = []
+    for poi in ranked[:args.limit]:
+        results.append({
+            "poi": {
+                "id": poi["id"],
+                "name": poi["name"],
+                "category": poi["category"],
+                "subcategory": poi.get("subcategory", ""),
+                "distance_m": poi["distance_m"],
+                "direction": poi["direction"],
+                "tags": poi.get("tags", []),
+                "signature": poi.get("signature", ""),
+                "avg_price": poi.get("avg_price", 0),
+            },
+            "why": poi["why"],
+            "walk": walk_instruction(poi["distance_m"], poi["direction"]),
+            "novelty_score": poi["novelty_score"],
+        })
+
+    output = {
+        "mode": "around",
+        "location": {"lat": args.lat, "lng": args.lng},
+        "radius_m": args.radius,
+        "mood": args.mood,
+        "found": len(results),
+        "recommendations": results,
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def cmd_feedback(args):
+    result = {
+        "status": "recorded",
+        "poi_id": args.poi_id,
+        "score": args.score,
+        "note": args.note,
+        "message": f"已记录对 {args.poi_id} 的评价: {args.score}分",
+    }
+    if args.note:
+        result["message"] += f" ({args.note}) "
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_map(args):
+    user = novelty_ranker.load_user_profile(args.user)
+    visited = user.get("visited_pois", [])
+    taste = user.get("taste_profile", {})
+    output = {
+        "user": args.user,
+        "total_visited": len(visited),
+        "visited_pois": visited,
+        "explored_categories": list(taste.keys()),
+        "category_stats": {
+            cat: {"avg_score": info.get("score", 0), "visits": info.get("count", 0)}
+            for cat, info in taste.items()
+        },
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="streetscan", description="街探 - 实时行走发现引擎")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_drift = sub.add_parser("drift", help="开启逛街模式")
+    p_drift.add_argument("--lat", type=float, required=True)
+    p_drift.add_argument("--lng", type=float, required=True)
+    p_drift.add_argument("--heading", default=None, help="行走方向：北/东北/东/东南/南/西南/西/西北")
+    p_drift.add_argument("--radius", type=float, default=500)
+    p_drift.add_argument("--user", default="mock_user_zhao")
+    p_drift.add_argument("--mood", default="")
+    p_drift.add_argument("--hour", type=int, default=None, help="模拟时间 (小时, 0-23) ")
+    p_drift.set_defaults(func=cmd_drift)
+
+    p_around = sub.add_parser("around", help="查看周围")
+    p_around.add_argument("--lat", type=float, required=True)
+    p_around.add_argument("--lng", type=float, required=True)
+    p_around.add_argument("--radius", type=float, default=300)
+    p_around.add_argument("--mood", default="")
+    p_around.add_argument("--user", default="mock_user_zhao")
+    p_around.add_argument("--limit", type=int, default=5)
+    p_around.add_argument("--hour", type=int, default=None, help="模拟时间 (小时, 0-23) ")
+    p_around.set_defaults(func=cmd_around)
+
+    p_fb = sub.add_parser("feedback", help="评价一家店")
+    p_fb.add_argument("--poi-id", required=True)
+    p_fb.add_argument("--score", type=float, required=True)
+    p_fb.add_argument("--note", default="")
+    p_fb.set_defaults(func=cmd_feedback)
+
+    p_map = sub.add_parser("map", help="查看探索地图")
+    p_map.add_argument("--user", required=True)
+    p_map.set_defaults(func=cmd_map)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

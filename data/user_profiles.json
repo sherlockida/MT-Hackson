@@ -1,0 +1,67 @@
+{
+  "users": [
+    {
+      "id": "mock_user_zhao",
+      "name": "小赵",
+      "role": "程序员",
+      "city": "北京",
+      "district": "海淀",
+      "home_location": {"lat": 39.9889, "lng": 116.3060},
+      "work_location": {"lat": 39.9880, "lng": 116.3200},
+      "spice_tolerance": "high",
+      "budget_default": 60,
+      "dietary_exclude": ["荤菜"],
+      "vibe_preference": {"noise_level": 0.2, "light": 0.4, "crowd_density": 0.2, "social_vibe": 0.2, "energy": 0.3, "aesthetic": 0.3, "outdoor_ratio": 0.3},
+      "explore_tendency": "medium",
+      "visited_pois": ["r_0001", "r_0003", "r_0010", "r_0015", "r_0022", "r_0030"],
+      "search_history": ["拉面", "咖啡", "川菜"],
+      "taste_profile": {
+        "川菜": {"score": 8.5, "count": 12},
+        "拉面": {"score": 7.0, "count": 8},
+        "咖啡": {"score": 7.5, "count": 15}
+      }
+    },
+    {
+      "id": "mock_user_qian",
+      "name": "小钱",
+      "role": "设计师",
+      "city": "上海",
+      "district": "徐汇",
+      "home_location": {"lat": 31.1883, "lng": 121.4369},
+      "work_location": {"lat": 31.2000, "lng": 121.4500},
+      "spice_tolerance": "none",
+      "budget_default": 80,
+      "dietary_exclude": ["花生"],
+      "vibe_preference": {"noise_level": 0.3, "light": 0.7, "crowd_density": 0.4, "social_vibe": 0.5, "energy": 0.4, "aesthetic": 0.9, "outdoor_ratio": 0.5},
+      "explore_tendency": "high",
+      "visited_pois": ["r_0002", "r_0005", "r_0008"],
+      "search_history": ["brunch", "甜品", "展览", "网红店"],
+      "taste_profile": {
+        "西餐": {"score": 8.0, "count": 20},
+        "甜品": {"score": 9.0, "count": 15},
+        "日料": {"score": 7.5, "count": 10}
+      }
+    },
+    {
+      "id": "mock_user_sun",
+      "name": "小孙",
+      "role": "销售",
+      "city": "北京",
+      "district": "朝阳",
+      "home_location": {"lat": 39.9289, "lng": 116.4434},
+      "work_location": {"lat": 39.9400, "lng": 116.4600},
+      "spice_tolerance": "medium",
+      "budget_default": 200,
+      "dietary_exclude": [],
+      "vibe_preference": {"noise_level": 0.7, "light": 0.6, "crowd_density": 0.7, "social_vibe": 0.9, "energy": 0.8, "aesthetic": 0.5, "outdoor_ratio": 0.3},
+      "explore_tendency": "low",
+      "visited_pois": ["r_0001", "r_0002", "r_0003", "r_0004", "r_0005", "r_0010", "r_0015", "r_0020", "r_0025", "r_0030", "r_0035", "r_0040"],
+      "search_history": ["火锅", "烤肉", "KTV", "酒吧"],
+      "taste_profile": {
+        "火锅": {"score": 9.0, "count": 30},
+        "烤肉": {"score": 8.5, "count": 25},
+        "日料": {"score": 7.0, "count": 5}
+      }
+    }
+  ]
+}
