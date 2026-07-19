@@ -122,8 +122,6 @@ score = 0.45 × 新鲜度 + 0.30 × 意外度 + 0.25 × 场景匹配
 
 ---
 
----
-
 ## 技术栈
 
 Python 3.9+ · SQLite · OpenClaw SKILL.md 规范 · Haversine 空间计算 · CSP 约束求解 · 余弦相似度匹配
